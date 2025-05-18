@@ -3,8 +3,10 @@ import csv
 from scholarly import ProxyGenerator, scholarly
 import os
 import requests
+import json
+from datetime import datetime
 
-api_key = os.getenv('ELSEVIER_API_KEY')
+api_key = os.getenv('SCOPUS_API_KEY')
 # Initialize a global variable to track if the proxy setup has been done
 proxy_setup_done = False
 
@@ -52,6 +54,51 @@ def fetch_papers(search_string, min_results=8):
     return papers_details
 
 
+def search_semantic_scholar(search_string, start_year, limit=10):
+    """Search papers using Semantic Scholar API"""
+    api_key = os.getenv('SEMANTIC_SCHOLAR_API_KEY')
+    if not api_key:
+        return {"error": "Semantic Scholar API key not found"}
+    
+    url = "https://api.semanticscholar.org/graph/v1/paper/search"
+    headers = {
+        "x-api-key": api_key,
+        "Content-Type": "application/json"
+    }
+    
+    params = {
+        "query": search_string,
+        "year": f"{start_year}-{datetime.now().year}",
+        "limit": limit,
+        "fields": "title,authors,year,url,venue,abstract,externalIds,openAccessPdf"
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        papers = []
+        for paper in data.get('data', []):
+            authors = ", ".join([author.get('name', '') for author in paper.get('authors', [])])
+            papers.append({
+                "title": paper.get('title', 'No title'),
+                "author": authors,
+                "pub_year": paper.get('year', ''),
+                "publication_url": paper.get('url', ''),
+                "journal_name": paper.get('venue', ''),
+                "doi": paper.get('externalIds', {}).get('DOI', ''),
+                "publication_date": str(paper.get('year', '')) if paper.get('year') else '',
+                "paper_type": 'Journal' if 'journal' in paper.get('venue', '').lower() else 'Conference',
+                "abstract": paper.get('abstract', ''),
+                "pdf_url": paper.get('openAccessPdf', {}).get('url', '') if paper.get('openAccessPdf') else ''
+            })
+        return papers
+    except Exception as e:
+        print(f"Error in search_semantic_scholar: {str(e)}")
+        return {"error": f"Failed to fetch papers from Semantic Scholar: {str(e)}"}
+
+
 def save_papers_to_csv(papers_details, filename='papers.csv'):
     fieldnames = ['title', 'author', 'pub_year', 'publication_url', 'journal_name', 'doi', 'publication_date', 'paper_type']
     with open(filename, mode='w', newline='', encoding='utf-8') as file:
@@ -59,8 +106,6 @@ def save_papers_to_csv(papers_details, filename='papers.csv'):
         writer.writeheader()
         for paper in papers_details:
             writer.writerow(paper)
-
-
 
 
 def search_elsevier(search_string, start_year, end_year, limit):

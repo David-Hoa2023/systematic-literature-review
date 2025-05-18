@@ -131,9 +131,15 @@ function App() {
             notification.warn({ message: "Please generate a search string first." });
             return;
         }
-        handleApiCall("/api/search_papers", // This endpoint doesn't use LLM model_name directly
-            { search_string: searchString, start_year: start_year, limit: limitPaper },
-            "Papers Found",
+        const source = e.target.dataset?.source || 'scopus';
+        handleApiCall("/api/search_papers",
+            { 
+                search_string: searchString, 
+                start_year: start_year, 
+                limit: limitPaper,
+                source: source
+            },
+            `Papers Found from ${source === 'semanticscholar' ? 'Semantic Scholar' : 'Scopus'}`,
             (data) => setPapersData(data || []) // data is expected to be an array of papers
         );
     };
@@ -287,7 +293,7 @@ function App() {
                 <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center", height: "100%"}}>
                     <RQicon width={"50px"} height={"50px"} />
                     <div style={{ fontSize: "20px", color: "black" }}>
-                        <strong>SLR Automation Tool</strong>
+                        <strong>Literature Review Automation</strong>
                     </div>
                     <div style={{width: "50px"}}> {/* Placeholder for balance */}</div>
                 </div>
@@ -396,7 +402,25 @@ function App() {
                                             <Input type="number" max={25} min={1} value={limitPaper} onChange={(e)=> setLimitPaper(e.target.value)}  placeholder="e.g., 10"/>
                                         </Form.Item>
                                     </Space>
-                                    <Button type="primary" onClick={fetchAndSavePapers} block>Fetch Papers from Scopus</Button>
+                                    <Space style={{ width: '100%', marginBottom: 16 }} direction="vertical">
+                                        <Button type="primary" onClick={fetchAndSavePapers} block>Fetch Papers from Scopus</Button>
+                                        <Button 
+                                            type="primary" 
+                                            onClick={(e) => {
+                                                const syntheticEvent = { ...e };
+                                                syntheticEvent.target = { ...e.target, dataset: { source: 'semanticscholar' } };
+                                                fetchAndSavePapers(syntheticEvent);
+                                            }} 
+                                            block
+                                            style={{ 
+                                                marginTop: '10px',
+                                                backgroundColor: '#28a745',
+                                                borderColor: '#28a745'
+                                            }}
+                                        >
+                                            Fetch Papers from Semantic Scholar
+                                        </Button>
+                                    </Space>
                                 </Form>
                             </div>
                         )}

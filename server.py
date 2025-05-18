@@ -12,7 +12,7 @@ from agents import (
 )
 # from agents2 import generate_search_string_with_gpt # Old name
 from agents2 import generate_search_string_llm # New name
-from agents3 import fetch_papers, save_papers_to_csv, search_elsevier # agents3.py unchanged by this request
+from agents3 import fetch_papers, save_papers_to_csv, search_elsevier, search_semantic_scholar # agents3.py unchanged by this request
 # from agents4 import filter_papers_with_gpt_turbo, generate_response_gpt4_turbo # Old names
 from agents4 import filter_papers_llm, generate_response_llm # New names
 
@@ -20,7 +20,13 @@ from flask_cors import CORS
 # import requests # Not directly used in this file after refactor
 # from datetime import datetime # Already imported
 
-load_dotenv() # Load .env file at the start
+from pathlib import Path
+
+# Explicitly resolve .env path
+env_path = Path(__file__).parent / '.env'
+print(f"[DEBUG] Loading .env from: {env_path}")
+load_dotenv(dotenv_path=env_path)
+print(f"[DEBUG] DEEPSEEK_API_KEY at startup: {os.getenv('DEEPSEEK_API_KEY')}")
 
 # ELSEVIER_API_KEY = os.getenv("ELSEVIER_API_KEY") # Renamed for clarity, was 'key'
 
@@ -184,34 +190,87 @@ def generate_summary_all_route():
     conclusion_summary = data.get("conclusion_summary", "No conclusion provided.")
 
     try:
+        # Ensure templates directory exists
+        templates_dir = os.path.join(os.path.dirname(__file__), 'templates')
+        if not os.path.exists(templates_dir):
+            os.makedirs(templates_dir)
+            return jsonify({"error": "Templates directory not found and could not be created"}), 500
+
+        # Ensure latex template exists
+        template_path = os.path.join(templates_dir, 'latex_template.tex')
+        if not os.path.exists(template_path):
+            return jsonify({"error": "LaTeX template file not found"}), 500
+
         latex_content = render_template(
-            "latex_template.tex", # Ensure this template exists in a 'templates' folder
+            "latex_template.tex",
             abstract=abstract_summary,
             introduction=intro_summary,
             conclusion=conclusion_summary,
         )
 
-        # Using tempfile for safer file handling
-        with tempfile.NamedTemporaryFile(mode='w+', suffix='.tex', delete=False, encoding='utf-8') as temp_file:
-            temp_file.write(latex_content)
-            temp_file_path = temp_file.name
+        # Create a temporary file with a proper name
+        temp_file = tempfile.NamedTemporaryFile(mode='w+', suffix='.tex', delete=False, encoding='utf-8')
+        temp_file_path = temp_file.name
         
-        # Send the file and then attempt to clean it up
-        # Note: delete=False means we need to manually clean up if not using send_from_directory with auto cleanup
-        response = send_file(temp_file_path, as_attachment=True, download_name='paper_summary.tex')
-        
-        # Clean up the temporary file after sending
-        # This might be tricky with how send_file works (it might close the file handle before this runs)
-        # A more robust cleanup might use Flask's after_this_request decorator
         try:
-            os.remove(temp_file_path)
-        except Exception as e_remove:
-            print(f"Error removing temporary file {temp_file_path}: {e_remove}")
+            temp_file.write(latex_content)
+            temp_file.close()  # Explicitly close the file before sending
             
-        return response
+            # Send the file
+            response = send_file(
+                temp_file_path,
+                as_attachment=True,
+                download_name='paper_summary.tex',
+                mimetype='application/x-latex'
+            )
+            
+            # Clean up the temporary file after sending
+            @response.call_on_close
+            def cleanup():
+                try:
+                    os.remove(temp_file_path)
+                except Exception as e:
+                    print(f"Error removing temporary file {temp_file_path}: {e}")
+            
+            return response
+            
+        except Exception as e:
+            # Clean up temp file if something goes wrong
+            try:
+                os.remove(temp_file_path)
+            except:
+                pass
+            raise e
         
     except Exception as e:
         print(f"Error in generate_summary_all_route: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/search_papers', methods=['POST'])
+def search_papers_route():
+    try:
+        data = request.json
+        search_string = data.get('search_string')
+        start_year = data.get('start_year', datetime.datetime.now().year - 1)
+        limit = data.get('limit', 10)
+        source = data.get('source', 'scopus')  # Default to scopus for backward compatibility
+        
+        if not search_string:
+            return jsonify({"error": "Search string is required"}), 400
+            
+        # Call the appropriate search function based on source
+        if source.lower() == 'semanticscholar':
+            papers = search_semantic_scholar(search_string, start_year, limit)
+        else:  # Default to scopus
+            papers = search_elsevier(search_string, start_year, start_year, limit)
+        
+        if isinstance(papers, dict) and "error" in papers:
+            return jsonify({"error": papers.get("error", "Failed to fetch papers")}), 500
+            
+        return jsonify(papers)
+        
+    except Exception as e:
+        print(f"Error in search_papers_route: {e}")
         return jsonify({"error": str(e)}), 500
 
 # --- Static file serving ---
@@ -227,9 +286,54 @@ def serve(path):
         # For SPA routing, always serve index.html for unknown paths
         return send_from_directory(app.static_folder, 'index.html')
 
+@app.route('/api/test-keys', methods=['GET'])
+def test_keys():
+    import requests
+    deepseek_key = os.getenv('DEEPSEEK_API_KEY')
+    openai_key = os.getenv('OPENAI_API_KEY')
+    result = {
+        'deepseek_key_loaded': bool(deepseek_key),
+        'openai_key_loaded': bool(openai_key),
+        'deepseek_api_status': None,
+        'openai_api_status': None,
+        'deepseek_message': '',
+        'openai_message': ''
+    }
+    # Test DeepSeek API (example endpoint, adjust as needed)
+    if deepseek_key:
+        try:
+            resp = requests.get(
+                'https://api.deepseek.com/v1/models',
+                headers={'Authorization': f'Bearer {deepseek_key}'}
+            )
+            result['deepseek_api_status'] = resp.status_code
+            if resp.ok:
+                result['deepseek_message'] = 'DeepSeek API key valid.'
+            else:
+                result['deepseek_message'] = f'DeepSeek API error: {resp.text}'
+        except Exception as e:
+            result['deepseek_api_status'] = 'error'
+            result['deepseek_message'] = str(e)
+    # Test OpenAI API (list models)
+    if openai_key:
+        try:
+            resp = requests.get(
+                'https://api.openai.com/v1/models',
+                headers={'Authorization': f'Bearer {openai_key}'}
+            )
+            result['openai_api_status'] = resp.status_code
+            if resp.ok:
+                result['openai_message'] = 'OpenAI API key valid.'
+            else:
+                result['openai_message'] = f'OpenAI API error: {resp.text}'
+        except Exception as e:
+            result['openai_api_status'] = 'error'
+            result['openai_message'] = str(e)
+    return jsonify(result)
+
 if __name__ == '__main__':
     # Ensure the 'templates' folder exists if render_template is used for latex_template.tex
     if not os.path.exists('templates'):
         print("Warning: 'templates' folder not found. LaTeX generation might fail if 'latex_template.tex' is not found by Flask.")
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)
 

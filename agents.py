@@ -1,16 +1,23 @@
 # agents.py
-import requests
-import json
-from flask import jsonify # Keep for existing error responses if any, though direct return is often better
 import os
+import json
 import re
+from pathlib import Path
+from dotenv import load_dotenv
+import requests
+from flask import jsonify  # Keep for existing error responses
 
-# Load API keys from .env file (ensure python-dotenv is installed and loaded in server.py or here)
-# from dotenv import load_dotenv
-# load_dotenv() # Call this at the beginning of your app, e.g., in server.py
+# Load environment variables from .env file in the same directory as this file
+env_path = Path(__file__).parent / '.env'
+load_dotenv(dotenv_path=env_path, override=True)
 
-OPENAI_API_KEY = os.getenv("API-KEY")
+# Get API keys
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+
+# Debug print to verify keys are loaded
+print(f"[AGENTS.PY] OPENAI_API_KEY loaded: {'Yes' if OPENAI_API_KEY else 'No'}")
+print(f"[AGENTS.PY] DEEPSEEK_API_KEY loaded: {'Yes' if DEEPSEEK_API_KEY else 'No'}")
 
 # API Endpoints
 OPENAI_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
