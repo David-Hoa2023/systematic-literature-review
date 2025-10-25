@@ -14,19 +14,28 @@ def setup_proxy():
     global proxy_setup_done
     # Check if the proxy setup has already been done
     if not proxy_setup_done:
-        # Set up a ProxyGenerator object to use free proxies
-        pg = ProxyGenerator()
-        pg.FreeProxies()
-        scholarly.use_proxy(pg)
-        
-        # Mark the setup as done
-        proxy_setup_done = True
-        print("Proxy setup completed.")
+        try:
+            # Set up a ProxyGenerator object to use free proxies
+            pg = ProxyGenerator()
+            pg.FreeProxies()
+            scholarly.use_proxy(pg)
+            
+            # Mark the setup as done
+            proxy_setup_done = True
+            print("Proxy setup completed.")
+        except Exception as e:
+            print(f"Proxy setup failed: {e}")
+            print("Continuing without proxy setup...")
+            proxy_setup_done = True  # Mark as done to avoid retrying
     else:
         print("Proxy setup was already completed earlier in this session.")
 
-# Example usage
-setup_proxy()
+# Example usage - wrapped in try-except to handle proxy failures gracefully
+try:
+    setup_proxy()
+except Exception as e:
+    print(f"Initial proxy setup failed: {e}")
+    print("Continuing without proxy setup...")
 
 
 

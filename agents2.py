@@ -7,7 +7,7 @@ import os
 # For this example, we'll re-define simplified call logic or you can import from agents.py
 # from agents import _call_openai_api, _call_deepseek_api, get_llm_response_content # Ideal case
 
-OPENAI_API_KEY = os.getenv("API-KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 OPENAI_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 DEEPSEEK_COMPLETIONS_URL = "https://api.deepseek.com/v1/chat/completions" # Placeholder
