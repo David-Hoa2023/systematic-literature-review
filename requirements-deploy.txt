@@ -1,0 +1,46 @@
+# Core Flask dependencies
+Flask==3.0.2
+Flask-Cors==4.0.0
+gunicorn==21.2.0
+
+# API and HTTP libraries
+requests==2.31.0
+httpx==0.27.0
+httpcore==1.0.4
+
+# Data processing (using html5lib instead of lxml to avoid libxslt dependency)
+beautifulsoup4==4.12.3
+html5lib==1.1
+
+# Scholarly and academic libraries
+scholarly==1.7.11
+bibtexparser==1.4.1
+
+# Environment and configuration
+python-dotenv==1.0.1
+
+# Date and time utilities
+python-dateutil==2.9.0.post0
+arrow==1.3.0
+
+# Text processing
+fake-useragent==1.5.0
+charset-normalizer==3.3.2
+
+# Networking
+urllib3==2.2.1
+PySocks==1.7.1
+
+# Core utilities
+click==8.1.7
+packaging==24.0
+typing_extensions==4.10.0
+certifi==2024.2.2
+idna==3.6
+six==1.16.0
+
+# Optional: Remove selenium for deployment if not needed
+# selenium==4.18.1
+
+# Remove lxml dependency to avoid libxslt issues
+# lxml==5.1.0
