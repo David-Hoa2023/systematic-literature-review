@@ -331,6 +331,13 @@ def test_keys():
             result['openai_message'] = str(e)
     return jsonify(result)
 
+# For Vercel serverless deployment
+def handler(event, context):
+    return app(event, context)
+
+# Export the Flask app for Vercel
+application = app
+
 if __name__ == '__main__':
     # Ensure the 'templates' folder exists if render_template is used for latex_template.tex
     if not os.path.exists('templates'):
